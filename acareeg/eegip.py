@@ -2,6 +2,7 @@ from pathlib import Path
 import mne
 from mne.io.eeglab.eeglab import _check_load_mat, _get_info
 from mne.preprocessing import read_ica_eeglab
+import os
 
 import numpy as np
 from collections import OrderedDict
@@ -9,11 +10,6 @@ from collections import OrderedDict
 
 models_path = Path("/home/christian/ni_connectivity_models")
 
-template_dict = {("london", "06"): "ANTS6-0Months3T",
-                 ("london", "12"): "ANTS12-0Months3T",
-                 ("washington", "06"): "ANTS6-0Months3T",
-                 ("washington", "12"): "ANTS12-0Months3T",
-                 ("washington", "18"): "ANTS18-0Months3T"}
 
 chan_mapping = {"E17": "NAS", "E22": "Fp1", "E9": "Fp2", "E11": "Fz", "E124": "F4", "E122": "F8", "E24": "F3",
                 "E33": "F7", "E36": "C3", "E45": "T7", "E104": "C4", "E108": "T8", "E52": "P3", "E57": "LM",
@@ -21,8 +17,8 @@ chan_mapping = {"E17": "NAS", "E22": "Fp1", "E9": "Fp2", "E11": "Fz", "E124": "F
                 "E83": "O2"}
 
 event_id = {
-    ("london", "06"): {"rst": 1},
-    ("london", "12"): {"base": 0, "eeg1": 1, "eeg2": 2, "eeg3": 3},
+    ("london", 6): {"rst": 1},
+    ("london", 12): {"base": 0, "eeg1": 1, "eeg2": 2, "eeg3": 3},
     "washington": {
         "cov": {"cov": 0},
         "videos": {"cov": 0, "Toys": 1, "Socl": 2},
@@ -115,8 +111,7 @@ def remove_rejected_ica_components(raw, file_name, inplace=True):
         read_ica_eeglab(file_name).apply(raw.copy(), exclude=ind_comp_to_drop)
 
 
-
-def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channel=True, apply_ica=True):
+def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channel=False, apply_ica=True):
     raw = mne.io.read_raw_eeglab(path, preload=True, verbose=verbose)
     raw.set_montage(montage, verbose=verbose)
 
@@ -144,7 +139,7 @@ def process_events_london_resting_state(raw, age):
     annot_id = []
     freq = raw.info["sfreq"]
 
-    if age == "06":
+    if age == 6:
         rst0 = []
         rst1 = []
         for a in raw.annotations:
@@ -160,7 +155,7 @@ def process_events_london_resting_state(raw, age):
         annot_sample = (annot_sample * freq).astype(int)
         annot_id = [1] * len(annot_sample)
 
-    elif age == "12":
+    elif age == 12:
         #annots = [OrderedDict((("onset", 0), ("duration", 0), ("description", "base"), ('orig_time', None)))]
         #annots.extend([a for a in raw.annotations
         #               if a["description"] in ["eeg1", "eeg2", "eeg3"]])
@@ -245,3 +240,30 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1):
                                        tmax=tmax - 1.0 / freq, baseline=None,
                                        preload=True, reject_by_annotation=True)
         return None
+
+
+def get_resting_stage_epochs(subject, dataset, age, bids_root="/project/def-emayada/eegip/",
+                             subjects_dir=None, montage_name="HGSN129-montage.fif"):
+
+    eeg_path = Path(bids_root) / dataset / "derivatives" / "lossless" / f"sub-s{subject}" / f"ses-m{age:02}" / "eeg"
+    eeg_path = list(eeg_path.glob("*_qcr.set"))[0]
+
+    montage = None
+    if subjects_dir is None:
+        subjects_dir = Path(os.environ["SUBJECTS_DIR"])
+        template = f"ANTS{age}-0Months3T"
+        montage_path = Path(subjects_dir) / template / "montages" / montage_name
+        if montage_path.exists():
+            montage = mne.channels.read_dig_fif(str(montage_path))
+            montage.ch_names = ["E" + str(int(ch_name[3:])) for ch_name in montage.ch_names]
+            montage.ch_names[128] = "Cz"
+
+    if montage is None:
+        montage = mne.channels.make_standard_montage("GSN-HydroCel-129")
+
+    raw = preprocessed_raw(eeg_path, line_freqs[dataset], montage)
+    events = process_events_resting_state(raw, dataset, age)
+    if events is None:
+        return
+    return process_epochs(raw, dataset, age, events)
+
