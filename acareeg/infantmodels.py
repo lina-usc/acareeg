@@ -1,17 +1,12 @@
+# Authors: Christian O'Reilly <christian.oreilly@gmail.com>
+# License: MIT
+
 from pathlib import Path
 import os
 import mne
 import time
 import xarray as xr
-from mne.io.eeglab.eeglab import _check_load_mat, _get_info
-from mne.preprocessing import read_ica_eeglab
-
 import numpy as np
-from collections import OrderedDict
-import pandas as pd
-import neurokit as nk
-import nolds
-
 
 
 def get_bem_artifacts(template, montage_name="HGSN129-montage.fif", subjects_dir=None):
@@ -37,7 +32,7 @@ def get_head_models(ages=("6mo", "12mo", "18mo"), subjects_dir=None):
 def validate_model(template, subjects_dir=None):
     get_head_models()
 
-    montage, trans, bem_model, bem_solution, surface_src = get_bem_artifacts(templat, subjects_dir=subjects_dir)
+    montage, trans, bem_model, bem_solution, surface_src = get_bem_artifacts(template, subjects_dir=subjects_dir)
     montage.ch_names = ["E" + str(int(ch_name[3:])) for ch_name in montage.ch_names]
     montage.ch_names[128] = "Cz"
 
@@ -78,22 +73,20 @@ def process_sources(epochs, trans, surface_src, bem_solution, fwd_mindist=0, dia
                                                  pick_ori=pick_ori, return_generator=return_generator)
 
 
-def sources_to_labels(stcs, age=None, template=None, parc='aparc',
-                      mode='mean_flip', allow_empty=True, return_generator=False,
-                      subjects_dir=None):
+def sources_to_labels(stcs, age=None, template=None, parc='aparc', mode='mean_flip',
+                      allow_empty=True, return_generator=False, subjects_dir=None):
+    if template is None:
+        if age is not None:
+            template = f"ANTS{age}-0Months3T"
+        else:
+            raise ValueError("The age or the template must be specified.")
 
-        if template is None:
-            if age is not None:
-                template = f"ANTS{age}-0Months3T"
-            else:
-                raise ValueError("The age or the template must be specified.")
+    montage, trans, bem_model, bem_solution, surface_src = get_bem_artifacts(template, subjects_dir=subjects_dir)
 
-        montage, trans, bem_model, bem_solution, surface_src = get_bem_artifacts(template, subjects_dir=subjects_dir)
-
-        anat_label = mne.read_labels_from_annot(template, subjects_dir=subjects_dir, parc=parc)
-        label_ts = mne.extract_label_time_course(stcs, anat_label, surface_src, mode=mode,
-                                                 allow_empty=allow_empty, return_generator=return_generator)
-        return label_ts, anat_label
+    anat_label = mne.read_labels_from_annot(template, subjects_dir=subjects_dir, parc=parc)
+    label_ts = mne.extract_label_time_course(stcs, anat_label, surface_src, mode=mode,
+                                             allow_empty=allow_empty, return_generator=return_generator)
+    return label_ts, anat_label
 
 
 def compute_sources(epochs, age, subjects_dir=None, template=None, return_labels=False, return_xr=True,
@@ -116,10 +109,10 @@ def compute_sources(epochs, age, subjects_dir=None, template=None, return_labels
         label_ts, anat_label = sources_to_labels(stcs, age=age, subjects_dir=subjects_dir)
         if return_xr:
             return xr.DataArray(np.array(label_ts),
-                                      dims=("epoch", "region", "time"),
-                                      coords={"epoch": np.arange(len(label_ts)),
-                                              "region": [label.name for label in anat_label],
-                                              "time": epochs.times})
+                                dims=("epoch", "region", "time"),
+                                coords={"epoch": np.arange(len(label_ts)),
+                                        "region": [label.name for label in anat_label],
+                                        "time": epochs.times})
         return label_ts, anat_label
 
     stcs = process_sources(epochs, trans, surface_src, bem_solution, return_generator=False,

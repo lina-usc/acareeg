@@ -1,3 +1,6 @@
+# Authors: Christian O'Reilly <christian.oreilly@gmail.com>
+# License: MIT
+
 import os
 import pandas as pd
 import numpy as np
@@ -6,6 +9,7 @@ from collections import OrderedDict
 from mne.io.eeglab.eeglab import _check_load_mat, _get_info
 from mne.preprocessing import read_ica_eeglab
 from pathlib import Path
+import xarray as xr
 
 from .infantmodels import compute_sources
 
@@ -136,7 +140,7 @@ def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channe
     return raw
 
 
-def process_events_london_resting_state(raw, age):
+def process_events_london_resting_state(raw, age, tmax=1):
     annot_sample = []
     annot_id = []
     freq = raw.info["sfreq"]
@@ -158,9 +162,6 @@ def process_events_london_resting_state(raw, age):
         annot_id = [1] * len(annot_sample)
 
     elif age == 12:
-        #annots = [OrderedDict((("onset", 0), ("duration", 0), ("description", "base"), ('orig_time', None)))]
-        #annots.extend([a for a in raw.annotations
-        #               if a["description"] in ["eeg1", "eeg2", "eeg3"]])
         annots = [a for a in raw.annotations if a["description"] in ["eeg1", "eeg2", "eeg3"]]
         if len(annots) == 0:
             return None
@@ -184,14 +185,11 @@ def process_events_london_resting_state(raw, age):
     return np.array([annot_sample, [0] * len(annot_sample), annot_id], dtype=int).T
 
 
-def process_events_washington_resting_state(raw):
+def process_events_washington_resting_state(raw, tmax=1):
     annot_sample = []
     annot_id = []
     freq = raw.info["sfreq"]
 
-    # COV AND VIDEOS
-    #annots = [OrderedDict((("onset", 0), ("duration", 0), ("description", "cov"), ('orig_time', None)))]
-    #annots.extend([a for a in raw.annotations if a["description"] in ["Toys", "EndM", "Socl"]])
     annots = [a for a in raw.annotations if a["description"] in ["Toys", "EndM", "Socl"]]
     if len(annots) == 0:
         return None
@@ -227,7 +225,6 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1):
     if dataset == "london":
         filtered_event_id = {key: val for key, val in event_id[("london", age)].items() if val in events[:, 2]}
         if len(filtered_event_id):
-            # "tmax = tmax[dataset] - 1.0 / freq" because MNE is inclusive on the last point and we don't want that
             # "baseline=None" because the baseline is corrected by a 1Hz high-pass on the raw data
             return mne.Epochs(raw, events, filtered_event_id, tmin=tmin,
                               tmax=tmax - 1.0 / freq, baseline=None,
@@ -239,8 +236,8 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1):
         filtered_event_id = {key: val for key, val in event_id[dataset]["videos"].items() if val in events[:, 2]}
         if len(filtered_event_id):
             return mne.Epochs(raw, events, filtered_event_id, tmin=tmin,
-                                       tmax=tmax - 1.0 / freq, baseline=None,
-                                       preload=True, reject_by_annotation=True)
+                              tmax=tmax - 1.0 / freq, baseline=None,
+                              preload=True, reject_by_annotation=True)
         return None
 
 
@@ -271,18 +268,17 @@ def get_resting_stage_epochs(subject, dataset, age, bids_root="/project/def-emay
 
 
 def get_connectivity(epochs, age, fmin=(4, 8, 12, 30, 4), fmax=(8, 12, 30, 100, 100),
-                        bands=("theta", "alpha", "beta", "gamma", "broadband"), con_name="ciplv",
-                        mode='multitaper', faverage=True, return_type="df"):
+                     bands=("theta", "alpha", "beta", "gamma", "broadband"), con_name="ciplv",
+                     mode='multitaper', faverage=True, return_type="df"):
 
     label_ts, anat_label = compute_sources(epochs, age, return_labels=True, return_xr=False)
     label_names = [label.name for label in anat_label]
 
-    sfreq = epochs.info['sfreq']  # the sampling frequency
-
+    sfreq = epochs.info['sfreq']
     dfs = []
     con, freqs, times, n_epochs, n_tapers = mne.connectivity.spectral_connectivity(label_ts, method=con_name,
-                                                                                    mode=mode, sfreq=sfreq, fmin=fmin,
-                                                                                    fmax=fmax, faverage=faverage)
+                                                                                   mode=mode, sfreq=sfreq, fmin=fmin,
+                                                                                   fmax=fmax, faverage=faverage)
 
     if return_type == "df":
         for mat, band in zip(con.transpose(2, 0, 1), bands):

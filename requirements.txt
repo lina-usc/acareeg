@@ -1,0 +1,11 @@
+mne
+xarray
+numpy
+tqdm
+scipy
+pandas
+matplotlib
+nibabel
+trimesh
+open3d
+pyrender

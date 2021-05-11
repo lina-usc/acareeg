@@ -1,12 +1,14 @@
+# Authors: Christian O'Reilly <christian.oreilly@gmail.com>
+# License: MIT
+
 import matplotlib.pyplot as plt
 from mne.externals.pymatreader import read_mat
 from mne.transforms import apply_trans
 import numpy as np
 import nibabel as nib
-import matplotlib.pylab as plt
 import pandas as pd
 from scipy.spatial import KDTree
-from nibabel.freesurfer.io import read_geometry, write_geometry
+from nibabel.freesurfer.io import read_geometry
 import trimesh
 import matplotlib as mpl
 import matplotlib.cm as cm
@@ -15,7 +17,6 @@ import mne
 import pyrender
 from pathlib import Path
 import os
-
 
 from .infantmodels import get_bem_artifacts
 
@@ -33,8 +34,6 @@ def get_plotting_meshes(amplitudes, vertices, age=None, template=None, norm=None
     vertices, triangles = get_pial_meshes(6)
 
     hemi_dict = {"lh": 0, "rh": 1}
-    offset_dict = {"lh": 0, "rh": surface_src[0]["nuse"]}
-
     if norm is None:
         norm = mpl.colors.Normalize(vmin=min(df["lh"].amplitude.min(), df["rh"].amplitude.min()),
                                     vmax=max(df["lh"].amplitude.max(), df["rh"].amplitude.max()))
@@ -183,21 +182,21 @@ def show_meshes(meshes, angle_x=-0.7854, angle_y=0, angle_z=0.31416, ax=None, re
     camera = pyrender.PerspectiveCamera(yfov=np.pi / 4.0, aspectRatio=1.0)
 
     camera_pose = np.eye(4)
-    camera_pose[:3 ,3] = [0, 0, 240]
+    camera_pose[:3, 3] = [0, 0, 240]
     scene.add(camera, pose=camera_pose)
 
-    ligth_poses = [np.array([[-0.   , -0.866,  0.5  ,  0.   ],
-                             [ 1.   , -0.   , -0.   ,  0.   ],
-                             [ 0.   ,  0.5  ,  0.866,  0.   ],
-                             [ 0.   ,  0.   ,  0.   ,  1.   ]]),
-                   np.array([[ 0.866,  0.433, -0.25 ,  0.   ],
-                             [-0.5  ,  0.75 , -0.433,  0.   ],
-                             [ 0.   ,  0.5  ,  0.866,  0.   ],
-                             [ 0.   ,  0.   ,  0.   ,  1.   ]]),
-                   np.array([[-0.866,  0.433, -0.25 ,  0.   ],
-                             [-0.5  , -0.75 ,  0.433,  0.   ],
-                             [ 0.   ,  0.5  ,  0.866,  0.   ],
-                             [ 0.   ,  0.   ,  0.   ,  1.   ]])]
+    ligth_poses = [np.array([[-0.000, -0.866,  0.500,  0.],
+                             [ 1.000, -0.000, -0.000,  0.],
+                             [ 0.000,  0.500,  0.866,  0.],
+                             [ 0.000,  0.000,  0.000,  1.]]),
+                   np.array([[ 0.866,  0.433, -0.250,  0.],
+                             [-0.500,  0.750, -0.433,  0.],
+                             [ 0.000,  0.500,  0.866,  0.],
+                             [ 0.000,  0.000,  0.000,  1.]]),
+                   np.array([[-0.866,  0.433, -0.250,  0.],
+                             [-0.500, -0.750,  0.433,  0.],
+                             [ 0.000,  0.500,  0.866,  0.],
+                             [ 0.000,  0.000,  0.000,  1.]])]
 
     for pose in ligth_poses:
         light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0],
@@ -212,6 +211,6 @@ def show_meshes(meshes, angle_x=-0.7854, angle_y=0, angle_z=0.31416, ax=None, re
     ind_ax0 = np.where(np.any(np.any(color != 255, axis=2), axis=1))[0]
     ind_ax1 = np.where(np.any(np.any(color != 255, axis=2), axis=0))[0]
 
-    ax.imshow(color[ind_ax0[0]:(ind_ax0[-1 ] +1), ind_ax1[0]:(ind_ax1[-1 ] +1), :])
+    ax.imshow(color[ind_ax0[0]:(ind_ax0[-1]+1), ind_ax1[0]:(ind_ax1[-1]+1), :])
 
     return ax
