@@ -10,6 +10,8 @@ from mne.io.eeglab.eeglab import _check_load_mat, _get_info
 from mne.preprocessing import read_ica_eeglab
 from pathlib import Path
 import xarray as xr
+import paramiko
+import getpass
 
 from .infantmodels import compute_sources
 
@@ -45,6 +47,22 @@ line_freqs = {"london": 50.0, "washington": 60.0}
 
 patterns = {"london": "derivatives/lossless/sub-s*/ses-m{age}/eeg/sub-s*_ses-m{age}_eeg_qcr.set",
             "washington": "derivatives/lossless/sub-s*/ses-m{age}/eeg/sub-s*_ses-m{age}_task-*_eeg_qcr.set"}
+
+
+def get_mastersheet(host="helios.calculquebec.ca", port=22,
+                    mastersheet_filename="mastersheet_20210428.xlsx", force_download=False):
+    if not Path("mastersheet.xlsx").exists() or force_download:
+        username = input(f'Enter your username for {host}:')
+        password = getpass.getpass(f'Enter password for {host}:')
+
+        transport = paramiko.Transport((host, port))
+        transport.connect(None, username, password)
+
+        with paramiko.SFTPClient.from_transport(transport) as sftp_client:
+            mastersheet_path = f'/project/def-emayada/oreillyc-shuberty/eegip_mastersheet/{mastersheet_filename}'
+            sftp_client.get(mastersheet_path, "mastersheet.xlsx")
+
+    return pd.read_excel("mastersheet.xlsx", index_col=0, header=0)
 
 
 def preprocess(raw, notch_width=None, line_freq=50.0):
@@ -300,3 +318,8 @@ def get_connectivity(epochs, age, fmin=(4, 8, 12, 30, 4), fmax=(8, 12, 30, 100, 
                             coords={"region1": label_names,
                                     "region2": label_names,
                                     "band": bands})
+
+
+
+
+
