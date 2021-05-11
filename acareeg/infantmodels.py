@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import mne
+import time
 import xarray as xr
 from mne.io.eeglab.eeglab import _check_load_mat, _get_info
 from mne.preprocessing import read_ica_eeglab
@@ -10,6 +11,7 @@ from collections import OrderedDict
 import pandas as pd
 import neurokit as nk
 import nolds
+
 
 
 def get_bem_artifacts(template, montage_name="HGSN129-montage.fif", subjects_dir=None):
@@ -32,10 +34,10 @@ def get_head_models(ages=("6mo", "12mo", "18mo"), subjects_dir=None):
         mne.datasets.fetch_infant_template(age, subjects_dir=subjects_dir)
 
 
-def validate_model(template):
+def validate_model(template, subjects_dir=None):
     get_head_models()
 
-    montage, trans, bem_model, bem_solution, surface_src = get_bem_artifacts(template)
+    montage, trans, bem_model, bem_solution, surface_src = get_bem_artifacts(templat, subjects_dir=subjects_dir)
     montage.ch_names = ["E" + str(int(ch_name[3:])) for ch_name in montage.ch_names]
     montage.ch_names[128] = "Cz"
 
