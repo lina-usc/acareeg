@@ -1,11 +1,13 @@
-from pathlib import Path
+import os
+import pandas as pd
+import numpy as np
 import mne
+from collections import OrderedDict
 from mne.io.eeglab.eeglab import _check_load_mat, _get_info
 from mne.preprocessing import read_ica_eeglab
-import os
+from pathlib import Path
 
-import numpy as np
-from collections import OrderedDict
+from .infantmodels import compute_sources
 
 
 models_path = Path("/home/christian/ni_connectivity_models")
@@ -267,3 +269,38 @@ def get_resting_stage_epochs(subject, dataset, age, bids_root="/project/def-emay
         return
     return process_epochs(raw, dataset, age, events)
 
+
+def get_connectivity(epochs, age, fmin=(4, 8, 12, 30, 4), fmax=(8, 12, 30, 100, 100),
+                        bands=("theta", "alpha", "beta", "gamma", "broadband"), con_name="ciplv",
+                        mode='multitaper', faverage=True, return_type="df"):
+
+    label_ts, anat_label = compute_sources(epochs, age, return_labels=True, return_xr=False)
+    label_names = [label.name for label in anat_label]
+
+    sfreq = epochs.info['sfreq']  # the sampling frequency
+
+    dfs = []
+    con, freqs, times, n_epochs, n_tapers = mne.connectivity.spectral_connectivity(label_ts, method=con_name,
+                                                                                    mode=mode, sfreq=sfreq, fmin=fmin,
+                                                                                    fmax=fmax, faverage=faverage)
+
+    if return_type == "df":
+        for mat, band in zip(con.transpose(2, 0, 1), bands):
+            mat = pd.DataFrame(mat) + np.triu(mat * np.nan)
+            mat.index = label_names
+            mat.columns = label_names
+            df = mat.reset_index().melt(id_vars="index").dropna()
+            df.columns = ["region1", "region2", "con"]
+            df["con_name"] = con_name
+            df["band"] = band
+            df["age"] = age
+            dfs.append(df)
+
+        return pd.concat(dfs)
+
+    if return_type == "xr":
+        return xr.DataArray(con,
+                            dims=("region1", "region2", "band"),
+                            coords={"region1": label_names,
+                                    "region2": label_names,
+                                    "band": bands})

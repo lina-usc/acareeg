@@ -11,8 +11,6 @@ import pandas as pd
 import neurokit as nk
 import nolds
 
-from acareeg.eegip import mark_bad_channels, add_bad_segment_annot, remove_rejected_ica_components
-
 
 def get_bem_artifacts(template, montage_name="HGSN129-montage.fif", subjects_dir=None):
 
@@ -65,7 +63,7 @@ def validate_model(template):
 
 
 def process_sources(epochs, trans, surface_src, bem_solution, fwd_mindist=0, diag_cov=False,
-                    cov_method="auto", loose=0.0, inv_method="eLORETA", lambda2=0.1, pick_ori=None,
+                    cov_method="auto", loose=0.0, inv_method="eLORETA", lambda2=1e-4, pick_ori=None,
                     return_generator=True):
 
     fwd = mne.make_forward_solution(epochs.info, trans, surface_src, bem_solution, mindist=fwd_mindist)
@@ -96,7 +94,8 @@ def sources_to_labels(stcs, age=None, template=None, parc='aparc',
         return label_ts, anat_label
 
 
-def compute_sources(epochs, age, subjects_dir=None, template=None, return_labels=False):
+def compute_sources(epochs, age, subjects_dir=None, template=None, return_labels=False, return_xr=True,
+                    loose=0.0, inv_method="eLORETA", lambda2=1e-4):
     get_head_models()
 
     if template is None:
@@ -110,20 +109,24 @@ def compute_sources(epochs, age, subjects_dir=None, template=None, return_labels
     epochs.set_montage(montage)
 
     if return_labels:
-        stcs = process_sources(epochs, trans, surface_src, bem_solution, return_generator=True)
-        label_ts, anat_label = sources_to_labels(stcs, age=age)
-        sources_xr = xr.DataArray(np.array(label_ts),
-                                  dims=("epoch", "region", "time"),
-                                  coords={"epoch": np.arange(len(label_ts)),
-                                          "region": [label.name for label in anat_label],
-                                          "time": epochs.times})
-        return sources_xr
+        stcs = process_sources(epochs, trans, surface_src, bem_solution, return_generator=True,
+                               loose=loose, inv_method=inv_method, lambda2=lambda2)
+        label_ts, anat_label = sources_to_labels(stcs, age=age, subjects_dir=subjects_dir)
+        if return_xr:
+            return xr.DataArray(np.array(label_ts),
+                                      dims=("epoch", "region", "time"),
+                                      coords={"epoch": np.arange(len(label_ts)),
+                                              "region": [label.name for label in anat_label],
+                                              "time": epochs.times})
+        return label_ts, anat_label
 
-    stcs = process_sources(epochs, trans, surface_src, bem_solution, return_generator=False)
-    stcs = np.stack([stc.data for stc in stcs])
-    sources_xr = xr.DataArray(stcs,
-                              dims=("epoch", "source", "time"),
-                              coords={"epoch": np.arange(len(stcs)),
-                                      "source": np.arange(stcs.shape[1]),
-                                      "time": epochs.times})
-    return sources_xr
+    stcs = process_sources(epochs, trans, surface_src, bem_solution, return_generator=False,
+                           loose=loose, inv_method=inv_method, lambda2=lambda2)
+    if return_xr:
+        stcs = np.stack([stc.data for stc in stcs])
+        return xr.DataArray(stcs,
+                            dims=("epoch", "source", "time"),
+                            coords={"epoch": np.arange(len(stcs)),
+                                    "source": np.arange(stcs.shape[1]),
+                                    "time": epochs.times})
+    return stcs
