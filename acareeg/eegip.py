@@ -259,7 +259,7 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1):
 def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emayada/eegip/",
                              subjects_dir=None, montage_name="HGSN129-montage.fif"):
 
-    eeg_path = Path(bids_root) / dataset / "derivatives" / "lossless" / f"sub-s{subject}" / f"ses-m{age:02}" / "eeg"
+    eeg_path = Path(bids_root) / dataset / "derivatives" / "lossless" / f"sub-s{subject:03}" / f"ses-m{age:02}" / "eeg"
     eeg_path = list(eeg_path.glob("*_qcr.set"))[0]
 
     montage = None
@@ -285,10 +285,13 @@ def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emay
 def get_connectivity(epochs, age, fmin=(4, 8, 12, 30, 4), fmax=(8, 12, 30, 100, 100),
                      bands=("theta", "alpha", "beta", "gamma", "broadband"), con_name="ciplv",
                      mode='multitaper', faverage=True, return_type="df", minimal_snr=None,
-                     verbose=True, template=None):
+                     verbose=True, template=None, src_kwargs=None):
+
+    if src_kwargs is None:
+        src_kwargs = {}
 
     label_ts, anat_label = compute_sources(epochs, age, template=template, return_labels=True, return_xr=False,
-                                           minimal_snr=minimal_snr, verbose=verbose)
+                                           minimal_snr=minimal_snr, verbose=verbose, **src_kwargs)
     label_names = [label.name for label in anat_label]
 
     sfreq = epochs.info['sfreq']
