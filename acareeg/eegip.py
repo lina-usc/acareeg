@@ -256,7 +256,7 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1):
         return None
 
 
-def get_resting_stage_epochs(subject, dataset, age, bids_root="/project/def-emayada/eegip/",
+def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emayada/eegip/",
                              subjects_dir=None, montage_name="HGSN129-montage.fif"):
 
     eeg_path = Path(bids_root) / dataset / "derivatives" / "lossless" / f"sub-s{subject}" / f"ses-m{age:02}" / "eeg"
