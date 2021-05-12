@@ -166,7 +166,8 @@ def get_template_source_meshes(template_dipole_df, template):
     return meshes
 
 
-def show_meshes(meshes, angle_x=-0.7854, angle_y=0, angle_z=0.31416, ax=None, resolution=(1200, 1200)):
+def show_meshes(meshes, angle_x=-0.7854, angle_y=0, angle_z=0.31416, 
+                ax=None, resolution=(1200, 1200), interactive=False):
 
     if ax is None:
         fig, ax = plt.subplots(1, 1)
@@ -202,15 +203,18 @@ def show_meshes(meshes, angle_x=-0.7854, angle_y=0, angle_z=0.31416, ax=None, re
         light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0],
                                           intensity=1.0)
         scene.add(light, pose=pose)
-    r = pyrender.OffscreenRenderer(*resolution)
-    color, depth = r.render(scene)
-    if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-    ax.axis('off')
+    if interactive:
+        pyrender.Viewer(scene, use_raymond_lighting=True)
+    else:
+        r = pyrender.OffscreenRenderer(*resolution)
+        color, depth = r.render(scene)
+        if ax is None:
+            fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        ax.axis('off')
+    
+        ind_ax0 = np.where(np.any(np.any(color != 255, axis=2), axis=1))[0]
+        ind_ax1 = np.where(np.any(np.any(color != 255, axis=2), axis=0))[0]
+    
+        ax.imshow(color[ind_ax0[0]:(ind_ax0[-1]+1), ind_ax1[0]:(ind_ax1[-1]+1), :])
 
-    ind_ax0 = np.where(np.any(np.any(color != 255, axis=2), axis=1))[0]
-    ind_ax1 = np.where(np.any(np.any(color != 255, axis=2), axis=0))[0]
-
-    ax.imshow(color[ind_ax0[0]:(ind_ax0[-1]+1), ind_ax1[0]:(ind_ax1[-1]+1), :])
-
-    return ax
+        return ax
