@@ -7,8 +7,10 @@ import scipy
 import tqdm
 
 
-def get_epochs_sim(epochs, stcs, fwd, return_snr=False):
-    raw_sim = mne.simulation.simulate_raw(info=epochs.info, stc=stcs, forward=fwd, verbose=False)
+def get_epochs_sim(epochs, stcs, fwd, noise_cov=None, return_snr=False):
+    raw_sim = mne.simulation.simulate_raw(info=epochs.info, stc=stcs, forward=fwd)
+    if noise_cov is not None:
+        raw_sim = mne.simulation.add_noise(raw_sim, noise_cov)
     nb_epochs = len(stcs)
     nb_samples = len(epochs.times)
     events = np.array([np.arange(0, nb_epochs * nb_samples, nb_samples), [0] * nb_epochs, [1] * nb_epochs]).T

@@ -16,9 +16,6 @@ import getpass
 from .infantmodels import compute_sources
 
 
-models_path = Path("/home/christian/ni_connectivity_models")
-
-
 chan_mapping = {"E17": "NAS", "E22": "Fp1", "E9": "Fp2", "E11": "Fz", "E124": "F4", "E122": "F8", "E24": "F3",
                 "E33": "F7", "E36": "C3", "E45": "T7", "E104": "C4", "E108": "T8", "E52": "P3", "E57": "LM",
                 "E58": "P7", "E92": "P4", "E100": "RM", "E96": "P8", "E62": "Pz", "E70": "O1", "E75": "Oz",
@@ -287,9 +284,11 @@ def get_resting_stage_epochs(subject, dataset, age, bids_root="/project/def-emay
 
 def get_connectivity(epochs, age, fmin=(4, 8, 12, 30, 4), fmax=(8, 12, 30, 100, 100),
                      bands=("theta", "alpha", "beta", "gamma", "broadband"), con_name="ciplv",
-                     mode='multitaper', faverage=True, return_type="df"):
+                     mode='multitaper', faverage=True, return_type="df", minimal_snr=None,
+                     verbose=True, template=None):
 
-    label_ts, anat_label = compute_sources(epochs, age, return_labels=True, return_xr=False)
+    label_ts, anat_label = compute_sources(epochs, age, template=template, return_labels=True, return_xr=False,
+                                           minimal_snr=minimal_snr, verbose=verbose)
     label_names = [label.name for label in anat_label]
 
     sfreq = epochs.info['sfreq']
@@ -320,6 +319,29 @@ def get_connectivity(epochs, age, fmin=(4, 8, 12, 30, 4), fmax=(8, 12, 30, 100, 
                                     "band": bands})
 
 
+def get_event_counts(dataset, bids_root="/project/def-emayada/eegip/"):
+    root = Path(bids_root) / dataset / "derivatives" / "lossless"
+    results = {"subjects": [], "ages": []}
+    for age in ["06", "12", "18"]:
+        for path in root.glob(f"sub-s*/ses-m{age}/eeg/sub-s*_ses-m{age}_eeg_qcr.set"):
+            print(path)
+            results["subjects"].append(str(path)[-23:-20])
+            results["ages"].append(age)
+            raw = mne.io.read_raw_eeglab(path)
+            event_names, counts = np.unique([annot["description"] for annot in raw.annotations], return_counts=True)
+            event_counts = dict(list(zip(event_names, counts)))
+            for event_name in event_names:
+                if event_name not in results:
+                    if len(results["ages"]) == 1:
+                        results[event_name] = []
+                    else:
+                        results[event_name] = [0]*(len(results["ages"])-1)
+            for event_name in results:
+                if event_name in ["ages", "subjects"]:
+                    continue
+                if event_name in event_counts:
+                    results[event_name].append(event_counts[event_name])
+                else:
+                    results[event_name].append(0)
 
-
-
+    return pd.DataFrame(results).sort_values(["ages", "subjects"])
