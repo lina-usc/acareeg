@@ -179,7 +179,7 @@ def process_events_london_resting_state(raw, age, tmax=1):
 
         # Keep only trials that are at least 10 s long.
         # All trials are defined by Rst0-Rst1 pair of events.
-        annot_sample = np.concatenate([np.arange(start*freq, stop*freq, tmax*freq)
+        annot_sample = np.concatenate([np.arange(start*freq, (stop-tmax)*freq, tmax*freq)
                                        for start, stop in zip(rst0, rst1)
                                        if stop - start > 10.0]).astype(int)
         annot_id = [1] * len(annot_sample)
@@ -240,7 +240,7 @@ def process_events_london_resting_state(raw, age, tmax=1):
         annot_id = []
         for onset, duration, trial_type in zip(onsets, durations, trial_types):
             annot_sample.append(np.arange(int(onset * freq),
-                                          int((onset+duration) * freq),
+                                          int((onset+duration-tmax) * freq),
                                           int(tmax * freq)))
             id_ = event_id[("london", age)][trial_type]
             annot_id.extend(id_ * np.ones(len(annot_sample[-1])))
@@ -250,6 +250,8 @@ def process_events_london_resting_state(raw, age, tmax=1):
 
     return np.array([annot_sample, [0] * len(annot_sample), annot_id], dtype=int).T
 
+def process_events_seattle_resting_state(*args, **kwargs):
+    process_events_washington_resting_state(*args, **kwargs)
 
 def process_events_washington_resting_state(raw, tmax=1):
     """
@@ -288,7 +290,7 @@ def process_events_washington_resting_state(raw, tmax=1):
 
     for annot, next_annot in zip(annots[:-1:2], annots[1::2]):
         annot_sample.append(np.arange(int(annot["onset"] * freq),
-                                      int(next_annot["onset"] * freq),
+                                      int((next_annot["onset"] - tmax) * freq),
                                       int(tmax * freq)))
         id_ = event_id["washington"]["videos"][annot["description"]]
         annot_id.extend(id_ * np.ones(len(annot_sample[-1])))
