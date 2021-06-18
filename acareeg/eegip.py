@@ -159,6 +159,12 @@ def process_events_london_resting_state(raw, age, tmax=1):
     freq = raw.info["sfreq"]
 
     if age == 6:
+        """
+         For London 6m, resting-state data are marked by pairs of Rst0-Rst1 events marking
+         the begining and the end of every resting-state trial. We reject any trial that has
+         a duration smaller than 10s.
+        """
+
         rst0 = []
         rst1 = []
         for a in raw.annotations:
@@ -179,6 +185,19 @@ def process_events_london_resting_state(raw, age, tmax=1):
         annot_id = [1] * len(annot_sample)
 
     elif age == 12:
+        """
+         For London 12m, resting-state data are marked only by Rst0 markers at the begining of
+         every trials. Trials and consecutives, so we can use the following Rst0 maker as being the 
+         end of the current trials. The last trials is ended with the last occurence of a SWIR or SWEN
+         event. 
+         
+         Trials shorter than 10s are rejected. Trials longer than 50s are truncated at 50s.
+         
+         Events eeg1, eeg2 and eeg3, when present, are at the same time as the Rst0 events. They 
+         are used to set the type of event (type of video that was presented). If no eegx event
+         is available for a Rst0, as type eeg4 is set, which indicate a resting-state event using
+         an unknown video.
+        """
 
         onsets = [annot["onset"] for annot in raw.annotations if annot["description"] == "Rst0"]
         if len(onsets) == 0:
