@@ -30,7 +30,6 @@ def get_bem_artifacts(template, montage_name="HGSN129-montage.fif", subjects_dir
         montage = mne.channels.make_standard_montage('GSN-HydroCel-129')
         return montage, trans, bem_model, bem_solution, surface_src
 
-
     montage = mne.channels.read_dig_fif(str(Path(subjects_dir) / template / "montages" / montage_name))
     trans = mne.channels.compute_native_head_t(montage)
     bem_model = mne.read_bem_surfaces(str(Path(subjects_dir) / template / "bem" / f"{template}-5120-5120-5120-bem.fif"))
@@ -61,12 +60,7 @@ def get_head_models(ages=("6mo", "12mo", "18mo"), subjects_dir=None):
 
 def validate_model(age=None, template=None, subjects_dir=None):
     get_head_models()
-
-    if template is None:
-        if age is not None:
-            template = f"ANTS{age}-0Months3T"
-        else:
-            raise ValueError("The age or the template must be specified.")
+    template = __validate_template__(age, template, subjects_dir)
 
     montage, trans, bem_model, bem_solution, surface_src = get_bem_artifacts(template, subjects_dir=subjects_dir)
     montage.ch_names = ["E" + str(int(ch_name[3:])) for ch_name in montage.ch_names]
@@ -111,18 +105,27 @@ def process_sources(epochs, trans, surface_src, bem_solution, fwd_mindist=5.0, d
         return stcs, fwd
     return stcs
 
-
-def region_centers_of_masse(age=None, template=None, parc="aparc", surf_name="pial",
-                            subjects_dir=None, include_vol_src=True):
+def __validate_template__(age=None, template=None, subjects_dir=None):
     if template is None:
         if age is not None:
             template = f"ANTS{age}-0Months3T"
         else:
             raise ValueError("The age or the template must be specified.")
 
+    if subjects_dir is None:
+        subjects_dir = Path(os.environ["SUBJECTS_DIR"])
+
+    if not (Path(subjects_dir) / template).exists():
+        raise ValueError(f"The template {template} is not available in {subjects_dir}. If this template is one "
+                         "of the standard infant templates, you can downloaded it using "
+                         "mne.datasets.fetch_infant_template")
+    return template
+
+def region_centers_of_masse(age=None, template=None, parc="aparc", surf_name="pial",
+                            subjects_dir=None, include_vol_src=True):
+    template = __validate_template__(age, template, subjects_dir)
     montage, trans, bem_model, bem_solution, src = get_bem_artifacts(template, subjects_dir=subjects_dir,
                                                                      include_vol_src=include_vol_src)
-
     center_of_masses_dict = {}
     if include_vol_src:
         for src_obj in src[2:]:
@@ -148,12 +151,7 @@ def region_centers_of_masse(age=None, template=None, parc="aparc", surf_name="pi
 def sources_to_labels(stcs, age=None, template=None, parc='aparc', mode='mean_flip',
                       allow_empty=True, return_generator=False, subjects_dir=None,
                       include_vol_src=True):
-    if template is None:
-        if age is not None:
-            template = f"ANTS{age}-0Months3T"
-        else:
-            raise ValueError("The age or the template must be specified.")
-
+    template = __validate_template__(age, template, subjects_dir)
     montage, trans, bem_model, bem_solution, src = get_bem_artifacts(template, subjects_dir=subjects_dir,
                                                                      include_vol_src=include_vol_src)
 
@@ -174,9 +172,7 @@ def compute_sources(epochs, age, subjects_dir=None, template=None, return_labels
                     return_xr=True, loose="auto", fixed=True, inv_method="eLORETA", pick_ori=None,
                     lambda2=1e-4, minimal_snr=None, verbose=True, include_vol_src=True):
     get_head_models()
-
-    if template is None:
-        template = f"ANTS{age}-0Months3T"
+    template = __validate_template__(age, template, subjects_dir)
     if subjects_dir is None:
         subjects_dir = Path(os.environ["SUBJECTS_DIR"])
 
