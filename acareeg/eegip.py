@@ -23,7 +23,7 @@ chan_mapping = {"E17": "NAS", "E22": "Fp1", "E9": "Fp2", "E11": "Fz", "E124": "F
 
 event_id = {
     ("london", 6): {"rst": 1},
-    ("london", 12): {"base": 0, "eeg1": 1, "eeg2": 2, "eeg3": 3},
+    ("london", 12): {"base": 0, "eeg1": 1, "eeg2": 2, "eeg3": 3, "eeg4": 4},
     "washington": {
         "cov": {"cov": 0},
         "videos": {"cov": 0, "Toys": 1, "Socl": 2},
@@ -74,8 +74,6 @@ def preprocess(raw, notch_width=None, line_freq=50.0):
 def mark_bad_channels(raw, file_name, mark_to_remove=("manual", "rank")):
     raw_eeg = _check_load_mat(file_name, None)
     info, _, _ = _get_info(raw_eeg)
-    print("############ file_name", file_name, type(file_name))
-    print("############ raw_eeg", raw_eeg.keys(), type(raw_eeg))
     chan_info = raw_eeg.marks["chan_info"]
 
     mat_chans = np.array(info["ch_names"])
@@ -161,6 +159,12 @@ def process_events_london_resting_state(raw, age, tmax=1):
     freq = raw.info["sfreq"]
 
     if age == 6:
+        """
+         For London 6m, resting-state data are marked by pairs of Rst0-Rst1 events marking
+         the begining and the end of every resting-state trial. We reject any trial that has
+         a duration smaller than 10s.
+        """
+
         rst0 = []
         rst1 = []
         for a in raw.annotations:
@@ -171,53 +175,122 @@ def process_events_london_resting_state(raw, age, tmax=1):
 
         if len(rst0) == 0 and len(rst1) == 0:
             return None
+        assert(len(rst0) == len(rst1))
 
-        annot_sample = np.concatenate([np.arange(start, stop - 0.999, 1.0) for start, stop in zip(rst0, rst1)])
-        annot_sample = (annot_sample * freq).astype(int)
+        # Keep only trials that are at least 10 s long.
+        # All trials are defined by Rst0-Rst1 pair of events.
+        annot_sample = np.concatenate([np.arange(start*freq, (stop-tmax)*freq, tmax*freq)
+                                       for start, stop in zip(rst0, rst1)
+                                       if stop - start > 10.0]).astype(int)
         annot_id = [1] * len(annot_sample)
 
     elif age == 12:
-        annots = [a for a in raw.annotations if a["description"] in ["eeg1", "eeg2", "eeg3"]]
-        if len(annots) == 0:
+        """
+         For London 12m, resting-state data are marked only by Rst0 markers at the begining of
+         every trials. Trials and consecutives, so we can use the following Rst0 maker as being the 
+         end of the current trials. The last trials is ended with the last occurence of a SWIR or SWEN
+         event. 
+         
+         Trials shorter than 10s are rejected. Trials longer than 50s are truncated at 50s.
+         
+         Events eeg1, eeg2 and eeg3, when present, are at the same time as the Rst0 events. They 
+         are used to set the type of event (type of video that was presented). If no eegx event
+         is available for a Rst0, as type eeg4 is set, which indicate a resting-state event using
+         an unknown video.
+        """
+
+        onsets = [annot["onset"] for annot in raw.annotations if annot["description"] == "Rst0"]
+        if len(onsets) == 0:
             return None
 
-        if raw.annotations[-1]["onset"] > annots[-1]["onset"]:
-            end = np.min([raw.annotations[-1]["onset"], annots[-1]["onset"] + 50.])
-            annots.append(OrderedDict((("onset", end), ("duration", 0),
-                                       ("description", "end"), ('orig_time', None))))
+        final_swir_swen_onset = [annot["onset"]
+                                 for annot in raw.annotations
+                                 if annot["description"] in ["SWEN", "SWIR"]][-1]
+        durations = list(np.diff(onsets)) + [final_swir_swen_onset - onsets[-1]]
 
-        for annot, next_annot in zip(annots[:-1], annots[1:]):
-            annot_sample.append(np.arange(int(annot["onset"] * freq),
-                                          int(next_annot["onset"] * freq),
+        # Truncate longer trials at 50s
+        durations = [min(d, 50) for d in durations]
+
+        # Reject any trial that last less than 10s
+        durations, onsets = zip(*[(d, onset) for d, onset in zip(durations, onsets) if d >= 10])
+
+        # Find eeg1, eeg2, eeg3 events clost (less than 5s appart) for Rst0 and attribute this event
+        # type. Else, attribute eeg4 (unpecified video type).
+        eegx_annots = [(a["description"], a["onset"])
+                       for a in raw.annotations
+                       if a["description"] in ["eeg1", "eeg2", "eeg3"]]
+        if len(eegx_annots):
+            eegx_desc, eegx_onsets = zip(*eegx_annots)
+        else:
+            eegx_desc = []
+            eegx_onsets = []
+
+        trial_types = []
+        for onset in onsets:
+            inds = np.where(np.abs(eegx_onsets-np.array(onset))<0.01)[0]
+            if len(inds) == 0:
+                trial_types.append("eeg4")
+            elif len(inds) == 1:
+                trial_types.append(eegx_desc[inds[0]])
+            else:
+                print(eegx_onsets)
+                print(onsets, final_swir_swen_onset)
+                raise RuntimeError
+
+        annot_id = []
+        for onset, duration, trial_type in zip(onsets, durations, trial_types):
+            annot_sample.append(np.arange(int(onset * freq),
+                                          int((onset+duration-tmax) * freq),
                                           int(tmax * freq)))
-            annot_id.extend(event_id[("london", age)][annot["description"]] * np.ones(len(annot_sample[-1])))
-
+            id_ = event_id[("london", age)][trial_type]
+            annot_id.extend(id_ * np.ones(len(annot_sample[-1])))
         annot_sample = np.concatenate(annot_sample)
-
     else:
         raise ValueError("Invalid value for session.")
 
     return np.array([annot_sample, [0] * len(annot_sample), annot_id], dtype=int).T
 
+def process_events_seattle_resting_state(*args, **kwargs):
+    process_events_washington_resting_state(*args, **kwargs)
 
 def process_events_washington_resting_state(raw, tmax=1):
+    """
+     The Seattle dataset comes with sequence of events like:
+      ['Socl', 'Socl', 'EndM', 'Toys', 'Toys', 'EndM', 'Socl', 'Socl', 'EndM', 'Toys', 'Toys', 'EndM']
+     The EndM markers can be ingnored and the pairs of either Socl or Toys indicate start-stop timing.
+    """
+
     annot_sample = []
     annot_id = []
     freq = raw.info["sfreq"]
 
-    annots = [a for a in raw.annotations if a["description"] in ["Toys", "EndM", "Socl"]]
+    annots = [a for a in raw.annotations if a["description"] in ["Toys", "Socl"]]
     if len(annots) == 0:
         return None
 
-    annots.append(OrderedDict((("onset", annots[-1]["onset"] + 50.), ("duration", 0),
-                               ("description", "end"), ('orig_time', None))))
+    """
+     There are three problematic series (subject age series):
+        102 12 ['Socl']
+        915 6 ['Toys', 'Toys', 'EndM', 'Socl']
+        915 12 ['Socl']
+     For all these cases the number of Socl/Toys is odd and the problematic event is the last one.
+     If we compare the time of the end of the file (subject age onset end_recording):
+        102 12 558.386 589.998
+        915 6 260.166 464.998
+        915 12 108.34 142.998
+     In two cases, the end of the file "close" those events but in one case, it does not (not until 200s, which
+     is too long. So we will close these open events at the end of the file or 60s after the onset, whichever
+     comes first.
+     """
+    if len(annots) % 2 == 1:
+        annots.append(OrderedDict((("onset", min(annots[-1]["onset"] + 60., raw.times[-1])),
+                                   ("duration", 0),
+                                   ("description", annots[-1]["description"]),
+                                   ('orig_time', None))))
 
-    for annot, next_annot in zip(annots[:-1], annots[1:]):
-        if annot["description"] == "EndM":
-            continue
-
+    for annot, next_annot in zip(annots[:-1:2], annots[1::2]):
         annot_sample.append(np.arange(int(annot["onset"] * freq),
-                                      int(next_annot["onset"] * freq),
+                                      int((next_annot["onset"] - tmax) * freq),
                                       int(tmax * freq)))
         id_ = event_id["washington"]["videos"][annot["description"]]
         annot_id.extend(id_ * np.ones(len(annot_sample[-1])))
@@ -227,14 +300,14 @@ def process_events_washington_resting_state(raw, tmax=1):
     return np.array([annot_sample, [0] * len(annot_sample), annot_id], dtype=int).T
 
 
-def process_events_resting_state(raw, dataset, age):
+def process_events_resting_state(raw, dataset, age, tmax=1):
     if dataset == "london":
-        return process_events_london_resting_state(raw, age)
+        return process_events_london_resting_state(raw, age, tmax=tmax)
     if dataset == "washington":
-        return process_events_washington_resting_state(raw)
+        return process_events_washington_resting_state(raw, tmax=tmax)
 
 
-def process_epochs(raw, dataset, age, events, tmin=0, tmax=1):
+def process_epochs(raw, dataset, age, events, tmin=0, tmax=1, verbose=None):
 
     freq = raw.info["sfreq"]
     if dataset == "london":
@@ -243,7 +316,8 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1):
             # "baseline=None" because the baseline is corrected by a 1Hz high-pass on the raw data
             return mne.Epochs(raw, events, filtered_event_id, tmin=tmin,
                               tmax=tmax - 1.0 / freq, baseline=None,
-                              preload=True, reject_by_annotation=True)
+                              preload=True, reject_by_annotation=True,
+                              verbose=verbose)
         return None
 
     elif dataset == "washington":
@@ -252,15 +326,20 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1):
         if len(filtered_event_id):
             return mne.Epochs(raw, events, filtered_event_id, tmin=tmin,
                               tmax=tmax - 1.0 / freq, baseline=None,
-                              preload=True, reject_by_annotation=True)
+                              preload=True, reject_by_annotation=True,
+                              verbose=verbose)
         return None
 
 
 def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emayada/eegip/",
                              subjects_dir=None, montage_name="HGSN129-montage.fif"):
-
+    subject = int(subject)
+    age = int(age)
     eeg_path = Path(bids_root) / dataset / "derivatives" / "lossless" / f"sub-s{subject:03}" / f"ses-m{age:02}" / "eeg"
-    eeg_path = list(eeg_path.glob("*_qcr.set"))[0]
+    eeg_path = list(eeg_path.glob("*_qcr.set"))
+    if len(eeg_path) == 0:
+        return None
+    eeg_path = eeg_path[0]
 
     montage = None
     if subjects_dir is None:
@@ -327,7 +406,6 @@ def get_event_counts(dataset, bids_root="/project/def-emayada/eegip/"):
     results = {"subjects": [], "ages": []}
     for age in ["06", "12", "18"]:
         for path in root.glob(f"sub-s*/ses-m{age}/eeg/sub-s*_ses-m{age}_eeg_qcr.set"):
-            print(path)
             results["subjects"].append(str(path)[-23:-20])
             results["ages"].append(age)
             raw = mne.io.read_raw_eeglab(path)
