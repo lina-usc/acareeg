@@ -46,8 +46,8 @@ patterns = {"london": "derivatives/lossless/sub-s*/ses-m{age}/eeg/sub-s*_ses-m{a
             "washington": "derivatives/lossless/sub-s*/ses-m{age}/eeg/sub-s*_ses-m{age}_task-*_eeg_qcr.set"}
 
 
-def get_mastersheet(host="helios.calculquebec.ca", port=22,
-                    mastersheet_filename="mastersheet_20210428.xlsx", force_download=False):
+def get_mastersheet(host="beluga.calculquebec.ca", port=22,
+                    mastersheet_filename="mastersheet_latest.xlsx", force_download=False):
     if not Path("mastersheet.xlsx").exists() or force_download:
         username = input(f'Enter your username for {host}:')
         password = getpass.getpass(f'Enter password for {host}:')
@@ -56,7 +56,7 @@ def get_mastersheet(host="helios.calculquebec.ca", port=22,
         transport.connect(None, username, password)
 
         with paramiko.SFTPClient.from_transport(transport) as sftp_client:
-            mastersheet_path = f'/project/def-emayada/oreillyc-shuberty/eegip_mastersheet/{mastersheet_filename}'
+            mastersheet_path = f'/project/def-emayada/notebooks/eegip_mastersheet/{mastersheet_filename}'
             sftp_client.get(mastersheet_path, "mastersheet.xlsx")
 
     return pd.read_excel("mastersheet.xlsx", index_col=0, header=0)
@@ -344,6 +344,7 @@ def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emay
 
     montage = None
     if subjects_dir is None:
+
         subjects_dir = Path(os.environ["SUBJECTS_DIR"])
         template = f"ANTS{age}-0Months3T"
         montage_path = Path(subjects_dir) / template / "montages" / montage_name
