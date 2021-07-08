@@ -48,6 +48,10 @@ patterns = {"london": "derivatives/lossless/sub-s*/ses-m{age}/eeg/sub-s*_ses-m{a
 
 def get_mastersheet(host="beluga.calculquebec.ca", port=22,
                     mastersheet_filename="mastersheet_latest.xlsx", force_download=False):
+    
+    if host == "localhost":
+        return pd.read_excel(f'/project/def-emayada/notebooks/eegip_mastersheet/{mastersheet_filename}')
+
     if not Path("mastersheet.xlsx").exists() or force_download:
         username = input(f'Enter your username for {host}:')
         password = getpass.getpass(f'Enter password for {host}:')
@@ -59,7 +63,7 @@ def get_mastersheet(host="beluga.calculquebec.ca", port=22,
             mastersheet_path = f'/project/def-emayada/notebooks/eegip_mastersheet/{mastersheet_filename}'
             sftp_client.get(mastersheet_path, "mastersheet.xlsx")
 
-    return pd.read_excel("mastersheet.xlsx", index_col=0, header=0)
+        return pd.read_excel("mastersheet.xlsx", index_col=0, header=0)
 
 
 def preprocess(raw, notch_width=None, line_freq=50.0):
