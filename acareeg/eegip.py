@@ -130,7 +130,8 @@ def remove_rejected_ica_components(raw, file_name, inplace=True):
         read_ica_eeglab(file_name).apply(raw.copy(), exclude=ind_comp_to_drop)
 
 
-def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channel=False, apply_ica=True):
+def preprocessed_raw(path, line_freq, montage=None, verbose=False,
+                     rename_channel=False, apply_ica=True):
     raw = mne.io.read_raw_eeglab(path, preload=True, verbose=verbose)
     raw.set_montage(montage, verbose=verbose)
 
@@ -332,7 +333,7 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1, verbose=None):
 
 
 def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emayada/eegip/",
-                             subjects_dir=None, montage_name="HGSN129-montage.fif"):
+                             subjects_dir=None, montage_name="HGSN129-montage.fif", tmax=1.0):
     subject = int(subject)
     age = int(age)
     eeg_path = Path(bids_root) / dataset / "derivatives" / "lossless" / f"sub-s{subject:03}" / f"ses-m{age:02}" / "eeg"
@@ -355,10 +356,10 @@ def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emay
         montage = mne.channels.make_standard_montage("GSN-HydroCel-129")
 
     raw = preprocessed_raw(eeg_path, line_freqs[dataset], montage)
-    events = process_events_resting_state(raw, dataset, age)
+    events = process_events_resting_state(raw, dataset, age, tmax=tmax)
     if events is None:
         return
-    return process_epochs(raw, dataset, age, events)
+    return process_epochs(raw, dataset, age, events, tmax=tmax)
 
 
 def get_connectivity(epochs, age, fmin=(4, 8, 12, 30, 4), fmax=(8, 12, 30, 100, 100),

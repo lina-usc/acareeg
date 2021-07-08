@@ -13,6 +13,18 @@ import pandas as pd
 from .simulation import get_epochs_sim
 
 
+# resting state networks: default mode network (DMN), dorsal attentional network (DAN), salience network (SAN), auditory network (AUD), visual network (VIS)
+# As per: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5462789/
+dmn_aparc_mapping = {'DMN': ['isthmuscingulate', 'medialorbitofrontal', 'posteriorcingulate',
+                             'precuneus', 'rostralanteriorcingulate', 'lateralorbitofrontal',
+                             'parahippocampal'],
+                     'DAN': ['caudalanteriorcingulate', 'inferiortemporal', 'middletemporal',
+                             'parsopercularis', 'parsorbitalis', 'parstriangularis'],
+                     'SAN': ['insula', 'rostralmiddlefrontal', 'supramarginal', 'caudalmiddlefrontal'],
+                     'AUD': ['superiortemporal'],
+                     'VIS': ['cuneus', 'lateraloccipital', 'fusiform', 'lingual']}
+
+
 def get_bem_artifacts(template, montage_name="HGSN129-montage.fif", subjects_dir=None, include_vol_src=True,
                       labels_vol=('Left-Amygdala', 'Left-Caudate', 'Left-Hippocampus', 'Left-Pallidum',
                                   'Left-Putamen', 'Left-Thalamus', 'Right-Amygdala', 'Right-Caudate',
@@ -148,6 +160,11 @@ def region_centers_of_masse(age=None, template=None, parc="aparc", surf_name="pi
     return center_of_masses_df
 
 
+def get_template_labels(age=None, template=None, parc='aparc', subjects_dir=None):
+    template = __validate_template__(age, template, subjects_dir)
+    return mne.read_labels_from_annot(template, subjects_dir=subjects_dir, parc=parc)
+
+
 def sources_to_labels(stcs, age=None, template=None, parc='aparc', mode='mean_flip',
                       allow_empty=True, return_generator=False, subjects_dir=None,
                       include_vol_src=True):
@@ -155,7 +172,7 @@ def sources_to_labels(stcs, age=None, template=None, parc='aparc', mode='mean_fl
     montage, trans, bem_model, bem_solution, src = get_bem_artifacts(template, subjects_dir=subjects_dir,
                                                                      include_vol_src=include_vol_src)
 
-    labels_parc = mne.read_labels_from_annot(template, subjects_dir=subjects_dir, parc=parc)
+    labels_parc = get_template_labels(template, parc=parc, subjects_dir=subjects_dir)
     labels_ts = mne.extract_label_time_course(stcs, labels_parc, src, mode=mode, allow_empty=allow_empty,
                                              return_generator=return_generator)
 
