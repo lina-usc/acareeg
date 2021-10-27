@@ -130,7 +130,8 @@ def remove_rejected_ica_components(raw, file_name, inplace=True):
         read_ica_eeglab(file_name).apply(raw.copy(), exclude=ind_comp_to_drop)
 
 
-def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channel=False, apply_ica=True):
+def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channel=False, apply_ica=True,
+                     interp_bad_ch=True, reset_bads=True):
     raw = mne.io.read_raw_eeglab(path, preload=True, verbose=verbose)
     raw.set_montage(montage, verbose=verbose)
 
@@ -143,7 +144,8 @@ def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channe
     if apply_ica:
         remove_rejected_ica_components(raw, path, inplace=True)
 
-    raw = raw.interpolate_bads(reset_bads=True, verbose=verbose)
+    if interp_bad_ch:
+        raw = raw.interpolate_bads(reset_bads=reset_bads, verbose=verbose)
 
     if rename_channel:
         raw.rename_channels({ch: ch2 for ch, ch2 in chan_mapping.items() if ch in raw.ch_names})
