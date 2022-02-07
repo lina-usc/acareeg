@@ -46,20 +46,60 @@ patterns = {"london": "derivatives/lossless/sub-s*/ses-m{age}/eeg/sub-s*_ses-m{a
             "washington": "derivatives/lossless/sub-s*/ses-m{age}/eeg/sub-s*_ses-m{age}_task-*_eeg_qcr.set"}
 
 
-def get_mastersheet(host="helios.calculquebec.ca", port=22,
-                    mastersheet_filename="mastersheet_20210428.xlsx", force_download=False):
-    if not Path("mastersheet.xlsx").exists() or force_download:
-        username = input(f'Enter your username for {host}:')
-        password = getpass.getpass(f'Enter password for {host}:')
+def get_mastersheet(host="narval.calculquebec.ca", port=22,
+                    mastersheet_filename="mastersheet_latest.xlsx", force_download=False):
+    
+    from platform import node
+    mastersheet_path = f'/lustre03/project/def-emayada/notebooks/eegip_mastersheet' \
+                       f'/current_mastersheet/{mastersheet_filename}'
+    
+    #if the user is on the narval cluster
+    if 'narval' in platform.node() : 
+        mastersheet = mastersheet_path #grab the mastersheet locally
+        
+        return pd.read_excel(mastersheet, index_col=0, header=0)
+        
+    else :
+        if not Path("mastersheet.xlsx").exists() or force_download:
+            username = input(f'Enter your username for {host}:')
+            password = getpass.getpass(f'Enter password for {host}:')
 
-        transport = paramiko.Transport((host, port))
-        transport.connect(None, username, password)
+            transport = paramiko.Transport((host, port))
+            transport.connect(None, username, password)
 
-        with paramiko.SFTPClient.from_transport(transport) as sftp_client:
-            mastersheet_path = f'/project/def-emayada/oreillyc-shuberty/eegip_mastersheet/{mastersheet_filename}'
-            sftp_client.get(mastersheet_path, "mastersheet.xlsx")
+            with paramiko.SFTPClient.from_transport(transport) as sftp_client:
+                sftp_client.get(mastersheet_path, "mastersheet.xlsx")
 
-    return pd.read_excel("mastersheet.xlsx", index_col=0, header=0)
+            return pd.read_excel("mastersheet", index_col=0, header=0)
+
+def get_measure(host="narval.calculquebec.ca", port=22,
+                    measure='mullen', force_download=False):
+    from platform import node
+    import paramiko
+    import getpass
+    import pandas as pd
+
+    measure_path = f'/lustre03/project/def-emayada/notebooks/eegip_mastersheet'\
+                       f'/output_mastersheet_excel_file/frontend_sheets/eegip_{measure}.xlsx'
+    
+    #if the user is on the narval cluster
+    if 'narval' in node() : 
+        measure_path = measure_path #grab the measure locally
+        
+        return pd.read_excel(measure_path, index_col=0, header=0)
+        
+    else :
+        if not Path(f'eegip_{measure}.xlsx').exists() or force_download:
+            username = input(f'Enter your username for {host}:')
+            password = getpass.getpass(f'Enter password for {host}:')
+
+            transport = paramiko.Transport((host, port))
+            transport.connect(None, username, password)
+
+            with paramiko.SFTPClient.from_transport(transport) as sftp_client:
+                sftp_client.get(measure_path, f'eegip_{measure}.xlsx')
+
+            return pd.read_excel(f'eegip_{measure}.xlsx', index_col=0, header=0)
 
 
 def preprocess(raw, notch_width=None, line_freq=50.0):
