@@ -12,6 +12,7 @@ from pathlib import Path
 import xarray as xr
 import paramiko
 import getpass
+from platform import node
 
 from .infantmodels import compute_sources
 
@@ -48,29 +49,27 @@ patterns = {"london": "derivatives/lossless/sub-s*/ses-m{age}/eeg/sub-s*_ses-m{a
 
 def get_mastersheet(host="narval.calculquebec.ca", port=22,
                     mastersheet_filename="mastersheet_latest.xlsx", force_download=False):
-    
-    from platform import node
+
     mastersheet_path = f'/lustre03/project/def-emayada/notebooks/eegip_mastersheet' \
                        f'/current_mastersheet/{mastersheet_filename}'
     
-    #if the user is on the narval cluster
-    if 'narval' in platform.node() : 
-        mastersheet = mastersheet_path #grab the mastersheet locally
+    # if the user is on the narval cluster
+    if 'narval' in node() :
+        # grab the mastersheet locally
+        return pd.read_excel(mastersheet_path, index_col=0, header=0)
         
-        return pd.read_excel(mastersheet, index_col=0, header=0)
-        
-    else :
-        if not Path("mastersheet.xlsx").exists() or force_download:
-            username = input(f'Enter your username for {host}:')
-            password = getpass.getpass(f'Enter password for {host}:')
+    if not Path("mastersheet.xlsx").exists() or force_download:
+        username = input(f'Enter your username for {host}:')
+        password = getpass.getpass(f'Enter password for {host}:')
 
-            transport = paramiko.Transport((host, port))
-            transport.connect(None, username, password)
+        transport = paramiko.Transport((host, port))
+        transport.connect(None, username, password)
 
-            with paramiko.SFTPClient.from_transport(transport) as sftp_client:
-                sftp_client.get(mastersheet_path, "mastersheet.xlsx")
+        with paramiko.SFTPClient.from_transport(transport) as sftp_client:
+            sftp_client.get(mastersheet_path, "mastersheet.xlsx")
 
-            return pd.read_excel("mastersheet", index_col=0, header=0)
+        return pd.read_excel("mastersheet", index_col=0, header=0)
+
 
 def get_measure(host="narval.calculquebec.ca", port=22,
                     measure='mullen', force_download=False):
