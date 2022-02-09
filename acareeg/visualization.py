@@ -14,7 +14,11 @@ import matplotlib as mpl
 import matplotlib.cm as cm
 import open3d
 import mne
-import pyrender
+
+try:
+    import pyrender
+except:
+    pass
 from pathlib import Path
 import os
 
