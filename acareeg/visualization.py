@@ -12,7 +12,12 @@ from nibabel.freesurfer.io import read_geometry
 import trimesh
 import matplotlib as mpl
 import matplotlib.cm as cm
-import open3d
+
+try:
+    import open3d
+except:
+    pass
+    
 import mne
 
 try:
