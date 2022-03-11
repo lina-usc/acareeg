@@ -171,7 +171,7 @@ def sources_to_labels(stcs, age=None, template=None, parc='aparc', mode='mean_fl
 def compute_sources(epochs, age, subjects_dir=None, template=None, return_labels=False,
                     return_xr=True, loose="auto", fixed=True, inv_method="eLORETA", pick_ori=None,
                     lambda2=1e-4, minimal_snr=None, verbose=True, include_vol_src=True):
-    get_head_models(age, subjects_dir)
+    get_head_models([age], subjects_dir)
     template = __validate_template__(age, template, subjects_dir)
     if subjects_dir is None:
         subjects_dir = Path(os.environ["SUBJECTS_DIR"])
