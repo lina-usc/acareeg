@@ -59,7 +59,7 @@ def get_head_models(ages=("6mo", "12mo", "18mo"), subjects_dir=None):
 
 
 def validate_model(age=None, template=None, subjects_dir=None):
-    get_head_models()
+    get_head_models(ages, subjects_dir)
     template = __validate_template__(age, template, subjects_dir)
 
     montage, trans, bem_model, bem_solution, surface_src = get_bem_artifacts(template, subjects_dir=subjects_dir)
