@@ -13,6 +13,8 @@ import pandas as pd
 from .simulation import get_epochs_sim
 
 
+ages_dic = {0.5:'2wk', 1:'1mo', 2:'2mo', 3:'3mo', 4.5:'4.5mo', 6:'6mo', 7.5:'7.5mo', 9:'9mo', 10.5:'10.5mo', 12:'12mo', 15:'15mo', 18:'18mo', 24:'2yr'}
+
 def get_bem_artifacts(template, montage_name="HGSN129-montage.fif", subjects_dir=None, include_vol_src=True,
                       labels_vol=('Left-Amygdala', 'Left-Caudate', 'Left-Hippocampus', 'Left-Pallidum',
                                   'Left-Putamen', 'Left-Thalamus', 'Right-Amygdala', 'Right-Caudate',
@@ -171,7 +173,7 @@ def sources_to_labels(stcs, age=None, template=None, parc='aparc', mode='mean_fl
 def compute_sources(epochs, age, subjects_dir=None, template=None, return_labels=False,
                     return_xr=True, loose="auto", fixed=True, inv_method="eLORETA", pick_ori=None,
                     lambda2=1e-4, minimal_snr=None, verbose=True, include_vol_src=True):
-    get_head_models([age], subjects_dir)
+    get_head_models([ages_dic[age]], subjects_dir)
     template = __validate_template__(age, template, subjects_dir)
     if subjects_dir is None:
         subjects_dir = Path(os.environ["SUBJECTS_DIR"])
