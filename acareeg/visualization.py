@@ -12,6 +12,8 @@ from nibabel.freesurfer.io import read_geometry
 import trimesh
 import matplotlib as mpl
 import matplotlib.cm as cm
+import warnings
+
 
 try:
     import open3d
@@ -28,6 +30,36 @@ from pathlib import Path
 import os
 
 from .infantmodels import get_bem_artifacts
+
+
+
+def plot_values_topomap(value_dict, montage, axes, colorbar=True, cmap='RdBu_r',
+                        vmin=None, vmax=None, names=None, image_interp='bilinear', side_cb="right",
+                        sensors=True, show_names=True, **kwargs):
+    if names is None:
+        names = [ch for ch in montage.ch_names if ch in value_dict]
+
+    info = mne.create_info(names, sfreq=256, ch_types="eeg")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        mne.io.RawArray(np.zeros((len(names), 1)), info, copy=None, verbose=False).set_montage(montage)
+
+    im = mne.viz.plot_topomap([value_dict[ch] for ch in names], 
+                              pos=info, show=False, image_interp=image_interp,
+                              sensors=sensors, res=64, axes=axes, names=names, show_names=show_names,
+                              vmin=vmin, vmax=vmax, cmap=cmap, **kwargs)
+
+    if colorbar:
+        try:
+            cbar, cax = mne.viz.topomap._add_colorbar(axes, im[0], cmap, pad=.05,
+                                                      format='%3.2f', side=side_cb)
+            axes.cbar = cbar
+            cbar.ax.tick_params(labelsize=12)
+
+        except TypeError:
+            pass
+
+    return im
 
 
 def get_plotting_meshes(amplitudes, vertices, age=None, template=None, norm=None, cmap=None):
