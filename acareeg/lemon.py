@@ -2,7 +2,7 @@
 # License: MIT
 
 import mne
-from mne.externals.pymatreader import read_mat
+from pymatreader import read_mat
 import numpy as np
 from pathlib import Path
 
