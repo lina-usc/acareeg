@@ -2,7 +2,7 @@
 # License: MIT
 
 import matplotlib.pyplot as plt
-from mne.externals.pymatreader import read_mat
+from pymatreader import read_mat
 from mne.transforms import apply_trans
 import numpy as np
 import nibabel as nib
