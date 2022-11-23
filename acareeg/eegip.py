@@ -353,7 +353,11 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1, verbose=None):
 
 
 def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emayada/eegip/",
-                             subjects_dir=None, montage_name="HGSN129-montage.fif", tmax=1):
+                             subjects_dir=None, montage_name="HGSN129-montage.fif", tmax=1,
+                             rename_channel=False, apply_ica=True, interp_bad_ch=True, reset_bads=True):
+
+
+
     subject = int(subject)
     age = int(age)
     eeg_path = Path(bids_root) / dataset / "derivatives" / "lossless" / f"sub-s{subject:03}" / f"ses-m{age:02}" / "eeg"
@@ -375,7 +379,8 @@ def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emay
     if montage is None:
         montage = mne.channels.make_standard_montage("GSN-HydroCel-129")
 
-    raw = preprocessed_raw(eeg_path, line_freqs[dataset], montage)
+    raw = preprocessed_raw(eeg_path, line_freqs[dataset], montage, rename_channel=rename_channel, 
+                           apply_ica=apply_ica, interp_bad_ch=interp_bad_ch, reset_bads=reset_bads)
     events = process_events_resting_state(raw, dataset, age, tmax=tmax)
     if events is None:
         return
