@@ -123,6 +123,12 @@ def __validate_template__(age=None, template=None, subjects_dir=None):
                          "mne.datasets.fetch_infant_template")
     return template
 
+
+def get_template_labels(age=None, template=None, parc='aparc', subjects_dir=None):
+    template = __validate_template__(age, template, subjects_dir)
+    return mne.read_labels_from_annot(template, subjects_dir=subjects_dir, parc=parc)
+
+
 def region_centers_of_masse(age=None, template=None, parc="aparc", surf_name="pial",
                             subjects_dir=None, include_vol_src=True):
     template = __validate_template__(age, template, subjects_dir)

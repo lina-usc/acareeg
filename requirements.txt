@@ -10,3 +10,4 @@ trimesh
 open3d
 pyrender
 paramiko
+pymatreader
