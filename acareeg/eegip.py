@@ -150,8 +150,11 @@ def remove_rejected_ica_components(raw, file_name, inplace=True):
 
 
 def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channel=False, apply_ica=True,
-                     interp_bad_ch=True, reset_bads=True):
+                     interp_bad_ch=True, reset_bads=True, additional_bad_ch=None):
     raw = mne.io.read_raw_eeglab(path, preload=True, verbose=verbose)
+    if additional_bad_ch is not None:
+        raw.info['bads'].extend(additional_bad_ch)
+    
     raw.set_montage(montage, verbose=verbose)
 
     preprocess(raw, line_freq=line_freq, notch_width=np.array([0.0, 0.1, 0.01, 0.1]))
@@ -354,7 +357,8 @@ def process_epochs(raw, dataset, age, events, tmin=0, tmax=1, verbose=None):
 
 def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emayada/eegip/",
                              subjects_dir=None, montage_name="HGSN129-montage.fif", tmax=1,
-                             rename_channel=False, apply_ica=True, interp_bad_ch=True, reset_bads=True):
+                             rename_channel=False, apply_ica=True, interp_bad_ch=True, 
+                             reset_bads=True, additional_bad_ch=None):
 
 
 
@@ -380,7 +384,8 @@ def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emay
         montage = mne.channels.make_standard_montage("GSN-HydroCel-129")
 
     raw = preprocessed_raw(eeg_path, line_freqs[dataset], montage, rename_channel=rename_channel, 
-                           apply_ica=apply_ica, interp_bad_ch=interp_bad_ch, reset_bads=reset_bads)
+                           apply_ica=apply_ica, interp_bad_ch=interp_bad_ch, 
+                           reset_bads=reset_bads, additional_bad_ch=additional_bad_ch)
     events = process_events_resting_state(raw, dataset, age, tmax=tmax)
     if events is None:
         return
