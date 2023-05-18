@@ -5,8 +5,10 @@ from setuptools import setup
 
 
 if __name__ == "__main__":
-    hard_dependencies = ('numpy', 'scipy')
-    install_requires = list()
+    hard_dependencies = ('numpy', 'scipy', 'mne', 'xarray', 'tqdm', 'pandas', 
+                         'matplotlib', 'nibabel', 'trimesh', 'open3d', 
+                         'pyrender', 'paramiko', 'pymatreader')
+    install_requires = []
     with open('requirements.txt', 'r') as fid:
         for line in fid:
             req = line.strip()
