@@ -132,21 +132,34 @@ def add_bad_segment_annot(raw, file_name, mark_to_remove=("manual",)):
 
 
 def remove_rejected_ica_components(raw, file_name, inplace=True):
+    from collections.abc import Iterable
     raw_eeg = _check_load_mat(file_name, None)
     mark_to_remove = ["manual"]
     comp_info = raw_eeg.marks["comp_info"]
 
+
+    if isinstance(comp_info["flags"][0], Iterable):
+        # Fix for case wher comp_info['flags'] had an empty array
+        flags_and_labels = [(flag, label) for flag, label in zip(comp_info["flags"], comp_info["label"]) if len(flag)]
+        comp_info["flags"], comp_info["label"] = zip(*flags_and_labels)
+        comp_info["flags"] = list(comp_info["flags"])
+        comp_info["label"] = list(comp_info["label"])
     if len(np.array(comp_info["flags"]).shape) > 1:
-        ind_comp_to_drop = np.unique(np.concatenate([np.where(flags)[0] for flags, label in zip(comp_info["flags"],
-                                                                                                comp_info["label"])
-                                                     if label in mark_to_remove]))
+        ind_comp_to_drop = [np.where(flags)[0]
+                             for flags, label
+                             in zip(comp_info["flags"], comp_info["label"])
+                             if label in mark_to_remove]
+        if len(ind_comp_to_drop):
+            ind_comp_to_drop = np.unique(np.concatenate(ind_comp_to_drop))
+        else:
+            ind_comp_to_drop = np.array([])
     else:
         ind_comp_to_drop = np.where(comp_info["flags"])[0]
+    print(ind_comp_to_drop, "INDS TO DROP")
 
     if inplace:
-        read_ica_eeglab(file_name).apply(raw, exclude=ind_comp_to_drop)
-    else:
-        read_ica_eeglab(file_name).apply(raw.copy(), exclude=ind_comp_to_drop)
+        return read_ica_eeglab(file_name).apply(raw, exclude=ind_comp_to_drop)
+    return read_ica_eeglab(file_name).apply(raw.copy(), exclude=ind_comp_to_drop)
 
 
 def preprocessed_raw(path, line_freq, montage=None, verbose=False, rename_channel=False, apply_ica=True,
