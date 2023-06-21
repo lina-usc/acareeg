@@ -8,6 +8,7 @@ import mne
 from collections import OrderedDict
 from mne.io.eeglab.eeglab import _check_load_mat, _get_info
 from mne.preprocessing import read_ica_eeglab
+from mne.utils import logger
 from pathlib import Path
 import xarray as xr
 import paramiko
@@ -380,18 +381,22 @@ def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emay
     eeg_path = Path(bids_root) / dataset / "derivatives" / "lossless" / f"sub-s{subject:03}" / f"ses-m{age:02}" / "eeg"
     eeg_path = list(eeg_path.glob("*_qcr.set"))
     if len(eeg_path) == 0:
+        logger.warn(f"ACAR: No qcr file for {subject}m{age}. Aborting")
         return None
     eeg_path = eeg_path[0]
 
-    montage = None
-    if subjects_dir is None:
-        subjects_dir = Path(os.environ["SUBJECTS_DIR"])
-        template = f"ANTS{age}-0Months3T"
-        montage_path = Path(subjects_dir) / template / "montages" / montage_name
-        if montage_path.exists():
-            montage = mne.channels.read_dig_fif(str(montage_path))
-            montage.ch_names = ["E" + str(int(ch_name[3:])) for ch_name in montage.ch_names]
-            montage.ch_names[128] = "Cz"
+    if montage_name in mne.channels.get_builtin_montages():
+        montage = montage_name
+    else:
+        montage = None
+        if subjects_dir is None:
+            subjects_dir = Path(os.environ["SUBJECTS_DIR"])
+            template = f"ANTS{age}-0Months3T"
+            montage_path = Path(subjects_dir) / template / "montages" / montage_name
+            if montage_path.exists():
+                montage = mne.channels.read_dig_fif(str(montage_path))
+                montage.ch_names = ["E" + str(int(ch_name[3:])) for ch_name in montage.ch_names]
+                montage.ch_names[128] = "Cz"
 
     if montage is None:
         montage = mne.channels.make_standard_montage("GSN-HydroCel-129")
@@ -401,6 +406,7 @@ def get_resting_state_epochs(subject, dataset, age, bids_root="/project/def-emay
                            reset_bads=reset_bads, additional_bad_ch=additional_bad_ch)
     events = process_events_resting_state(raw, dataset, age, tmax=tmax)
     if events is None:
+        logger.warn(f"ACAR: No events for {subject}m{age}. Aborting")
         return
     return process_epochs(raw, dataset, age, events, tmax=tmax)
 
